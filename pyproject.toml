@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "ZKY", email = "zky@example.com" },
+    { name = "Eliton", email = "eliton-jorge@hotmail.com" },
 ]
 keywords = ["banking", "hexagonal-architecture", "domain-driven-design"]
 classifiers = [
