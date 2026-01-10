@@ -2,13 +2,13 @@
 
 Example project implementing a basic banking system using Hexagonal Architecture (Ports & Adapters) and Domain-Driven Design (DDD) in Python.
 
-This repository is being built incrementally. The current stage focuses on the **Domain Layer foundation** (value objects and domain errors).
+This repository is being built incrementally. The current stage includes the **Domain Layer** (value objects, domain errors, and core entities).
 
 ## Architecture
 
 ### Domain Layer
 
-The domain layer is framework-agnostic and contains the core business rules and domain types.
+The domain layer is framework-agnostic and contains the core business rules and domain types. It must not depend on infrastructure/framework code (e.g., FastAPI, SQLAlchemy).
 
 #### Domain Errors
 
@@ -29,9 +29,17 @@ Value objects are immutable and validated at instantiation. They encapsulate dom
 
 All value objects are frozen (immutable) and use dataclass slots for reduced memory overhead.
 
+#### Entities
+
+Entities represent domain concepts with identity and behavior:
+
+- **Account**: Aggregate root that holds account identity and balance, enforcing core invariants (e.g., no zero-amount operations and no overdraft).
+- **LedgerEntry**: Immutable record representing account movements (deposit, withdraw, transfer in/out) with timestamps and correlation support.
+- **LedgerEntryType**: Enum defining allowed ledger entry types.
+
 ## Testing
 
-Tests are organized under `tests/unit/domain/` and cover validation, operations, and error scenarios.
+Tests are organized under `tests/unit/domain/` and cover validation, operations, and error scenarios for domain objects.
 
 Run tests with:
 ```bash
