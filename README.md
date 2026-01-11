@@ -2,11 +2,11 @@
 
 Example project implementing a basic banking system using Hexagonal Architecture (Ports & Adapters) and Domain-Driven Design (DDD) in Python.
 
-This repository is being built incrementally. The current stage includes the **Domain Layer** and the **Application Layer** (use cases + ports). Next steps will add tests, database adapters, and a FastAPI interface.
+This repository is being built incrementally. The current stage includes the **Domain Layer**, the **Application Layer** (use cases + ports), and **unit tests** for domain and use cases. Next steps will add database adapters and a FastAPI interface.
 
 ## Architecture
 
-### Domain Layer (`zkybank/domain`)
+### Domain Layer (`src/zkybank/domain`)
 Framework-agnostic core business rules.
 
 #### Domain Errors
@@ -34,7 +34,7 @@ Domain entities encapsulating business behavior:
 
 ---
 
-### Application Layer (`zkybank/application`)
+### Application Layer (`src/zkybank/application`)
 Orchestrates domain behavior via ports (no infrastructure details).
 
 #### DTOs
@@ -54,13 +54,36 @@ Orchestrates domain behavior via ports (no infrastructure details).
 
 ---
 
-## Testing (planned)
-Unit tests will cover:
+## Development
+
+### Pre-commit
+Enable git hooks locally:
+
+```bash
+poetry run pre-commit install
+poetry run pre-commit run --all-files
+```
+
+---
+
+## Testing
+
+Tests cover:
 
 - **Domain**: value objects and entity invariants.
 - **Application**: use cases using fakes (in-memory repositories + fake UnitOfWork).
 
 Run tests with:
+
 ```bash
 poetry run pytest -v
 ```
+
+---
+
+## Project Status
+- ✅ Domain layer: value objects, entities, domain errors
+- ✅ Application layer: DTOs, ports, UnitOfWork, use cases
+- ✅ Unit tests: domain (entities + value objects) and application use cases (with fakes)
+- 🔄 Next: outbound adapters (SQLAlchemy + SQLite/Postgres)
+- 🔄 Next: inbound adapter (FastAPI) + integration/concurrency tests
