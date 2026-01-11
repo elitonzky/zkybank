@@ -2,44 +2,63 @@
 
 Example project implementing a basic banking system using Hexagonal Architecture (Ports & Adapters) and Domain-Driven Design (DDD) in Python.
 
-This repository is being built incrementally. The current stage includes the **Domain Layer** (value objects, domain errors, and core entities).
+This repository is being built incrementally. The current stage includes the **Domain Layer** and the **Application Layer** (use cases + ports). Next steps will add tests, database adapters, and a FastAPI interface.
 
 ## Architecture
 
-### Domain Layer
-
-The domain layer is framework-agnostic and contains the core business rules and domain types. It must not depend on infrastructure/framework code (e.g., FastAPI, SQLAlchemy).
+### Domain Layer (`zkybank/domain`)
+Framework-agnostic core business rules.
 
 #### Domain Errors
-
 Domain errors represent expected business-rule violations and are raised by domain objects:
 
-- `DomainError` (base class)
+- `DomainError` (base)
 - `InvalidMoneyError`
 - `InvalidAccountNumberError`
 - `InsufficientFundsError`
+- `SameAccountTransferError`
+- `InvalidTransactionAmountError`
 
 #### Value Objects
+Immutable and validated at instantiation:
 
-Value objects are immutable and validated at instantiation. They encapsulate domain concepts:
-
-- **Money**: Represents monetary amounts (in cents) with currency support. Provides arithmetic operations (`+`, `-`) and comparisons with currency validation.
-- **AccountNumber**: Represents bank account numbers with digit-only validation and length constraints (6–12 digits).
-- **AccountId**: Internal unique identifier for accounts, represented as UUID v4.
-
-All value objects are frozen (immutable) and use dataclass slots for reduced memory overhead.
+- **Money**: monetary amount in cents with currency validation and arithmetic/comparison operations.
+- **AccountNumber**: digit-only account number with length constraints.
+- **AccountId**: internal UUID identifier.
 
 #### Entities
+Domain entities encapsulating business behavior:
 
-Entities represent domain concepts with identity and behavior:
+- **Account**: open/deposit/withdraw operations with balance invariants.
+- **LedgerEntry**: append-only transaction log (`DEPOSIT`, `WITHDRAWAL`, `TRANSFER_IN`, `TRANSFER_OUT`).
 
-- **Account**: Aggregate root that holds account identity and balance, enforcing core invariants (e.g., no zero-amount operations and no overdraft).
-- **LedgerEntry**: Immutable record representing account movements (deposit, withdraw, transfer in/out) with timestamps and correlation support.
-- **LedgerEntryType**: Enum defining allowed ledger entry types.
+---
 
-## Testing
+### Application Layer (`zkybank/application`)
+Orchestrates domain behavior via ports (no infrastructure details).
 
-Tests are organized under `tests/unit/domain/` and cover validation, operations, and error scenarios for domain objects.
+#### DTOs
+- `commands.py`: inputs for use cases.
+- `results.py`: outputs for use cases.
+
+#### Ports
+- `AccountRepository`
+- `LedgerRepository`
+- `UnitOfWork` (transaction boundary and repository access; supports concurrency hook via `get_by_number_for_update`)
+
+#### Use Cases
+- `CreateAccountUseCase`
+- `DepositUseCase`
+- `WithdrawUseCase`
+- `TransferUseCase` (uses stable lock ordering to reduce deadlock risk once DB locks are implemented)
+
+---
+
+## Testing (planned)
+Unit tests will cover:
+
+- **Domain**: value objects and entity invariants.
+- **Application**: use cases using fakes (in-memory repositories + fake UnitOfWork).
 
 Run tests with:
 ```bash
