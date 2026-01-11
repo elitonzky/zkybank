@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from zkybank.adapters.outbound.persistence.sqlalchemy.session import (
+    build_session_factory,
+    create_all_tables,
+)
+from zkybank.adapters.outbound.persistence.sqlalchemy.unit_of_work import SqlAlchemyUnitOfWork
 from zkybank.application.dto.commands import (
     CreateAccountCommand,
     DepositCommand,
@@ -10,13 +15,9 @@ from zkybank.application.dto.commands import (
 )
 from zkybank.application.use_cases.create_account import CreateAccountUseCase
 from zkybank.application.use_cases.deposit import DepositUseCase
+from zkybank.application.use_cases.get_balance import GetBalanceUseCase
 from zkybank.application.use_cases.transfer import TransferUseCase
 from zkybank.application.use_cases.withdraw import WithdrawUseCase
-from zkybank.infrastructure.persistence.sqlalchemy.session import (
-    build_session_factory,
-    create_all_tables,
-)
-from zkybank.infrastructure.persistence.sqlalchemy.unit_of_work import SqlAlchemyUnitOfWork
 
 
 def _project_root() -> Path:
@@ -128,6 +129,17 @@ def main() -> None:
     )
 
     print("\n=== Smoke test completed successfully ===")
+
+    print("\n[STEP] Reading balances from database (GetBalanceUseCase)...")
+    balance_123 = GetBalanceUseCase(uow).execute("123456")
+    balance_456 = GetBalanceUseCase(uow).execute("456789")
+
+    print(
+        f"[OK] Balance: number={balance_123.account_number} balance_cents={balance_123.balance_cents} currency={balance_123.currency}"
+    )
+    print(
+        f"[OK] Balance: number={balance_456.account_number} balance_cents={balance_456.balance_cents} currency={balance_456.currency}"
+    )
 
 
 if __name__ == "__main__":
