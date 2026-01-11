@@ -23,6 +23,7 @@ class WithdrawCommand:
     amount_cents: int
     currency: str = "BRL"
 
+
 @dataclass(frozen=True, slots=True)
 class TransferCommand:
     from_account_number: str

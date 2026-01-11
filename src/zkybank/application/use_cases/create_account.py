@@ -47,7 +47,9 @@ class CreateAccountUseCase:
             currency=account.balance.currency,
         )
 
-    def _assert_account_does_not_exist(self, uow: UnitOfWork, account_number: AccountNumber) -> None:
+    def _assert_account_does_not_exist(
+        self, uow: UnitOfWork, account_number: AccountNumber
+    ) -> None:
         existing = uow.accounts.get_by_number(account_number)
         if existing is not None:
             raise AccountAlreadyExistsError(

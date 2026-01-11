@@ -35,5 +35,5 @@ class Account:
 
         if amount > self.balance:
             raise InsufficientFundsError("Insufficient funds for withdrawal")
-        
+
         self.balance = self.balance - amount
