@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session, sessionmaker
-from zkybank.application.ports.unit_of_work import UnitOfWork
-from zkybank.infrastructure.persistence.sqlalchemy.repositories.account_repository import (
+from zkybank.adapters.outbound.persistence.sqlalchemy.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
-from zkybank.infrastructure.persistence.sqlalchemy.repositories.ledger_repository import (
+from zkybank.adapters.outbound.persistence.sqlalchemy.repositories.ledger_repository import (
     SqlAlchemyLedgerRepository,
 )
+from zkybank.application.ports.unit_of_work import UnitOfWork
 
 
 class SqlAlchemyUnitOfWork(UnitOfWork):

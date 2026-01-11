@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import sessionmaker
-from zkybank.infrastructure.persistence.sqlalchemy.base import Base
+from zkybank.adapters.outbound.persistence.sqlalchemy.base import Base
 
 
 @dataclass(frozen=True, slots=True)
