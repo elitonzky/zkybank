@@ -4,7 +4,7 @@ import pytest
 
 from zkybank.domain.entities.account import Account
 from zkybank.domain.errors import InsufficientFundsError, InvalidMoneyError
-from zkybank.domain.value_objects import AccountId, AccountNumber, Money
+from zkybank.domain.value_objects import AccountNumber, Money
 
 
 class TestAccountFactory:
@@ -147,9 +147,7 @@ class TestAccountBalance:
         """Test that balance currency matches account currency."""
         currencies = ["BRL", "USD", "EUR"]
         for currency in currencies:
-            account = Account.open(
-                account_number=AccountNumber(value="123456"), currency=currency
-            )
+            account = Account.open(account_number=AccountNumber(value="123456"), currency=currency)
             assert account.balance.currency == currency
 
     def test_deposit_and_withdraw_sequence(self) -> None:
