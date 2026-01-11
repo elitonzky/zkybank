@@ -5,10 +5,10 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from zkybank.adapters.outbound.persistence.sqlalchemy.models import LedgerEntryModel
 from zkybank.application.ports.ledger_repository import LedgerRepository
 from zkybank.domain.entities.ledger_entry import LedgerEntry, LedgerEntryType
 from zkybank.domain.value_objects import AccountId, Money
-from zkybank.infrastructure.persistence.sqlalchemy.models import LedgerEntryModel
 
 
 class SqlAlchemyLedgerRepository(LedgerRepository):

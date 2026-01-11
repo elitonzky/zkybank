@@ -4,10 +4,10 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from zkybank.adapters.outbound.persistence.sqlalchemy.models import AccountModel
 from zkybank.application.ports.account_repository import AccountRepository
 from zkybank.domain.entities.account import Account
 from zkybank.domain.value_objects import AccountId, AccountNumber, Money
-from zkybank.infrastructure.persistence.sqlalchemy.models import AccountModel
 
 
 class SqlAlchemyAccountRepository(AccountRepository):

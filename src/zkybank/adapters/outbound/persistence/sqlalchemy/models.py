@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from zkybank.infrastructure.persistence.sqlalchemy.base import Base
+from zkybank.adapters.outbound.persistence.sqlalchemy.base import Base
 
 
 class AccountModel(Base):
