@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+load_dotenv()
+
 
 @dataclass(frozen=True, slots=True)
 class Settings:
@@ -13,9 +15,12 @@ class Settings:
 
     @staticmethod
     def from_env() -> "Settings":
-        load_dotenv()
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise ValueError("DATABASE_URL is required (set it in .env or environment variables).")
 
-        database_url = os.getenv("DATABASE_URL", "")
         log_level = os.getenv("LOG_LEVEL", "INFO")
-
         return Settings(database_url=database_url, log_level=log_level)
+
+
+settings = Settings.from_env()
