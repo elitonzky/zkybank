@@ -8,6 +8,7 @@ from zkybank.adapters.inbound.http.fastapi.schemas import (
     BalanceResponse,
     CreateAccountRequest,
     DepositRequest,
+    TransactionEntryResponse,
     TransactionResponse,
     WithdrawRequest,
 )
@@ -20,6 +21,7 @@ from zkybank.application.ports.unit_of_work import UnitOfWork
 from zkybank.application.use_cases.create_account import CreateAccountUseCase
 from zkybank.application.use_cases.deposit import DepositUseCase
 from zkybank.application.use_cases.get_balance import GetBalanceUseCase
+from zkybank.application.use_cases.get_transactions import GetTransactionsUseCase
 from zkybank.application.use_cases.withdraw import WithdrawUseCase
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -88,3 +90,23 @@ def withdraw(
         balance_cents=result.balance_cents,
         currency=result.currency,
     )
+
+
+@router.get("/{account_number}/transactions", response_model=list[TransactionEntryResponse])
+def list_transactions(
+    account_number: str,
+    uow: UnitOfWork = Depends(get_uow),
+) -> list[TransactionEntryResponse]:
+    results = GetTransactionsUseCase(uow).execute(account_number=account_number)
+    return [
+        TransactionEntryResponse(
+            entry_id=r.entry_id,
+            entry_type=r.entry_type.value,
+            amount_cents=r.amount_cents,
+            currency=r.currency,
+            correlation_id=r.correlation_id,
+            counterparty_account_number=getattr(r, "counterparty_account_number", None),
+            occurred_at=r.occurred_at,
+        )
+        for r in results
+    ]
