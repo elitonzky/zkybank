@@ -2,13 +2,79 @@ from __future__ import annotations
 
 import pytest
 
+from tests.unit.application.fakes import FakeUnitOfWork
 from zkybank.application.dto.commands import DepositCommand
-from zkybank.application.errors import AccountNotFoundError
+from zkybank.application.errors import AccountNotFoundError, ConcurrencyConflictError
+from zkybank.application.use_cases.create_account import CreateAccountCommand, CreateAccountUseCase
 from zkybank.application.use_cases.deposit import DepositUseCase
 from zkybank.domain.entities.account import Account
 from zkybank.domain.errors import InvalidMoneyError
 from zkybank.domain.value_objects import AccountNumber, Money
-from tests.unit.application.fakes import FakeUnitOfWork
+
+
+class TestDepositUseCaseConcurrency:
+    def test_deposit_retries_on_concurrency_conflict_and_succeeds(self) -> None:
+        uow = FakeUnitOfWork()
+
+        CreateAccountUseCase(uow).execute(
+            CreateAccountCommand(
+                account_number="111111",
+                initial_balance_cents=0,
+                currency="BRL",
+            )
+        )
+
+        # Reset commit/rollback flags because CreateAccountUseCase commits.
+        uow._committed = False
+        uow._rolled_back = False
+
+        # Simulate one transient concurrency conflict during lock acquisition.
+        uow.simulate_concurrency_conflicts(times=1)
+
+        result = DepositUseCase(uow).execute(
+            DepositCommand(
+                account_number="111111",
+                amount_cents=1500,
+                currency="BRL",
+            )
+        )
+
+        assert result.account_number == "111111"
+        assert result.balance_cents == 1500
+        assert uow._committed is True
+
+    def test_deposit_fails_after_max_retries(self) -> None:
+        uow = FakeUnitOfWork()
+
+        CreateAccountUseCase(uow).execute(
+            CreateAccountCommand(
+                account_number="111111",
+                initial_balance_cents=0,
+                currency="BRL",
+            )
+        )
+
+        # Reset commit/rollback flags because CreateAccountUseCase commits.
+        uow._committed = False
+        uow._rolled_back = False
+
+        # Simulate persistent conflicts so all retry attempts fail.
+        uow.simulate_concurrency_conflicts(times=99)
+
+        with pytest.raises(ConcurrencyConflictError):
+            DepositUseCase(uow).execute(
+                DepositCommand(
+                    account_number="111111",
+                    amount_cents=1500,
+                    currency="BRL",
+                )
+            )
+
+        account = uow.accounts.get_by_number(AccountNumber(value="111111"))
+        assert account is not None
+        assert account.balance.amount_cents == 0
+        assert uow._committed is False
+        assert uow._rolled_back is True
 
 
 class TestDepositUseCaseSuccess:
