@@ -50,3 +50,6 @@ smoke:
 
 clean-db:
 	rm -f data/zkybank.db data/zkybank.db-journal data/zkybank.db-wal data/zkybank.db-shm
+
+concurrency:
+	poetry run python -m zkybank.scripts.concurrency
