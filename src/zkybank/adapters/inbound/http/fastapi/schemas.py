@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
@@ -52,3 +55,13 @@ class TransferResponse(BaseModel):
     from_balance_cents: int
     to_balance_cents: int
     currency: str
+
+
+class TransactionEntryResponse(BaseModel):
+    entry_id: UUID
+    entry_type: str
+    amount_cents: int
+    currency: str
+    correlation_id: UUID | None
+    occurred_at: datetime
+    counterparty_account_number: str | None

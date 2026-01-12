@@ -166,6 +166,7 @@ class TransferUseCase:
                 entry_type=LedgerEntryType.TRANSFER_OUT,
                 amount=amount,
                 correlation_id=correlation_id,
+                counterparty_account_number=destination_account.account_number,
             )
         )
         uow.ledger.save(
@@ -174,6 +175,7 @@ class TransferUseCase:
                 entry_type=LedgerEntryType.TRANSFER_IN,
                 amount=amount,
                 correlation_id=correlation_id,
+                counterparty_account_number=source_account.account_number,
             )
         )
 

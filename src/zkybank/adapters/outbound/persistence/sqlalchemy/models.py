@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from zkybank.adapters.outbound.persistence.sqlalchemy.base import Base
 
@@ -19,10 +24,10 @@ class AccountModel(Base):
 
     account_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     account_number: Mapped[str] = mapped_column(String(12), unique=True, index=True, nullable=False)
+
     balance_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
-    # Optimistic concurrency control (OCC)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     ledger_entries: Mapped[list["LedgerEntryModel"]] = relationship(
@@ -37,18 +42,37 @@ class AccountModel(Base):
 
 class LedgerEntryModel(Base):
     __tablename__ = "ledger_entries"
-    __table_args__ = (CheckConstraint("amount_cents > 0", name="ck_ledger_amount_positive"),)
+    __table_args__ = (
+        CheckConstraint("length(currency) = 3", name="ck_ledger_currency_len"),
+        CheckConstraint("amount_cents >= 0", name="ck_ledger_amount_non_negative"),
+        CheckConstraint(
+            "counterparty_account_number IS NULL OR (length(counterparty_account_number) >= 6 AND length(counterparty_account_number) <= 12)",
+            name="ck_ledger_counterparty_account_number_len",
+        ),
+    )
 
-    entry_id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid4())
-    )
+    entry_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+
     account_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("accounts.account_id"), index=True, nullable=False
+        String(36),
+        ForeignKey("accounts.account_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
+
     entry_type: Mapped[str] = mapped_column(String(32), nullable=False)
+
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+
     correlation_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+    counterparty_account_number: Mapped[str | None] = mapped_column(String(12), nullable=True)
+
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    account: Mapped[AccountModel] = relationship("AccountModel", back_populates="ledger_entries")
+    account: Mapped["AccountModel"] = relationship(
+        "AccountModel",
+        back_populates="ledger_entries",
+        lazy="joined",
+    )
