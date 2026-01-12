@@ -4,7 +4,9 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 from zkybank.adapters.outbound.persistence.sqlalchemy.models import AccountModel
+from zkybank.application.errors import ConcurrencyConflictError
 from zkybank.application.ports.account_repository import AccountRepository
 from zkybank.domain.entities.account import Account
 from zkybank.domain.value_objects import AccountId, AccountNumber, Money
@@ -37,6 +39,7 @@ class SqlAlchemyAccountRepository(AccountRepository):
         account_id_str = str(account.account_id.value)
 
         existing = self._session.get(AccountModel, account_id_str)
+
         if existing is None:
             self._session.add(
                 AccountModel(
@@ -44,6 +47,7 @@ class SqlAlchemyAccountRepository(AccountRepository):
                     account_number=account.account_number.value,
                     balance_cents=account.balance.amount_cents,
                     currency=account.balance.currency,
+                    # version is managed by SQLAlchemy via version_id_col + default
                 )
             )
             return
@@ -52,9 +56,15 @@ class SqlAlchemyAccountRepository(AccountRepository):
         existing.balance_cents = account.balance.amount_cents
         existing.currency = account.balance.currency
 
+        try:
+            self._session.flush()
+        except StaleDataError as exc:
+            raise ConcurrencyConflictError("Account was updated concurrently.") from exc
+
     def _to_domain(self, model: AccountModel) -> Account:
         return Account(
             account_id=AccountId(value=UUID(model.account_id)),
             account_number=AccountNumber(model.account_number),
             balance=Money(amount_cents=model.balance_cents, currency=model.currency),
+            version=model.version,
         )

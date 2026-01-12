@@ -11,6 +11,7 @@ class Account:
     account_id: AccountId
     account_number: AccountNumber
     balance: Money
+    version: int = 0
 
     @staticmethod
     def open(account_number: AccountNumber, currency: str = "BRL") -> "Account":
@@ -19,6 +20,7 @@ class Account:
             account_id=AccountId.generate(),
             account_number=account_number,
             balance=Money.zero(currency=currency),
+            version=0,
         )
 
     def deposit(self, amount: Money) -> None:

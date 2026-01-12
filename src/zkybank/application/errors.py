@@ -23,3 +23,9 @@ class SameAccountTransferError(ApplicationError):
     """Raised when attempting to transfer funds to the same account."""
 
     pass
+
+
+class ConcurrencyConflictError(ApplicationError):
+    """Raised when a concurrency conflict is detected."""
+
+    pass

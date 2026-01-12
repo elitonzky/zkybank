@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from tests.unit.application.fakes import FakeUnitOfWork
 from zkybank.application.dto.commands import TransferCommand
 from zkybank.application.errors import (
     AccountNotFoundError,
+    ConcurrencyConflictError,
     SameAccountTransferError,
 )
 from zkybank.application.use_cases.transfer import TransferUseCase
@@ -12,7 +14,77 @@ from zkybank.domain.entities.account import Account
 from zkybank.domain.entities.ledger_entry import LedgerEntryType
 from zkybank.domain.errors import InsufficientFundsError, InvalidMoneyError
 from zkybank.domain.value_objects import AccountNumber, Money
-from tests.unit.application.fakes import FakeUnitOfWork
+
+
+class TestTransferUseCaseConcurrency:
+    def test_transfer_retries_on_concurrency_conflict_and_succeeds(self) -> None:
+        uow = FakeUnitOfWork()
+
+        source = Account.open(account_number=AccountNumber(value="111111"))
+        source.deposit(Money(amount_cents=5000))
+
+        destination = Account.open(account_number=AccountNumber(value="222222"))
+
+        uow.accounts.save(source)
+        uow.accounts.save(destination)
+
+        # Reset commit/rollback flags (defensive; depends on previous tests using same instance).
+        uow._committed = False
+        uow._rolled_back = False
+
+        # Simulate one transient concurrency conflict during lock acquisition.
+        uow.simulate_concurrency_conflicts(times=1)
+
+        use_case = TransferUseCase(uow)
+        result = use_case.execute(
+            TransferCommand(
+                from_account_number="111111",
+                to_account_number="222222",
+                amount_cents=2000,
+            )
+        )
+
+        assert result.from_balance_cents == 3000
+        assert result.to_balance_cents == 2000
+        assert uow._committed is True
+
+    def test_transfer_fails_after_max_retries(self) -> None:
+        uow = FakeUnitOfWork()
+
+        source = Account.open(account_number=AccountNumber(value="111111"))
+        source.deposit(Money(amount_cents=5000))
+
+        destination = Account.open(account_number=AccountNumber(value="222222"))
+
+        uow.accounts.save(source)
+        uow.accounts.save(destination)
+
+        uow._committed = False
+        uow._rolled_back = False
+
+        # Simulate persistent conflicts so all retry attempts fail.
+        uow.simulate_concurrency_conflicts(times=99)
+
+        use_case = TransferUseCase(uow)
+
+        with pytest.raises(ConcurrencyConflictError):
+            use_case.execute(
+                TransferCommand(
+                    from_account_number="111111",
+                    to_account_number="222222",
+                    amount_cents=2000,
+                )
+            )
+
+        source_after = uow.accounts.get_by_number(AccountNumber(value="111111"))
+        destination_after = uow.accounts.get_by_number(AccountNumber(value="222222"))
+
+        assert source_after is not None
+        assert destination_after is not None
+        assert source_after.balance.amount_cents == 5000
+        assert destination_after.balance.amount_cents == 0
+        assert uow._committed is False
+        assert uow._rolled_back is True
 
 
 class TestTransferUseCaseSuccess:
@@ -465,7 +537,7 @@ class TestTransferUseCaseEdgeCases:
             amount_cents=1000,
         )
 
-        result = use_case.execute(command)
+        use_case.execute(command)
 
         out_entry = uow.ledger._entries[0]
         in_entry = uow.ledger._entries[1]
