@@ -1,245 +1,6 @@
 # zkybank
 
-Example project implementing a basic banking system using **Hexagonal Architecture (Ports & Adapters)** and **Domain-Driven Design (DDD)** in Python.
-
-The project supports account creation, deposits, withdrawals, transfers, and balance/transaction queries, with an explicit focus on **transaction integrity under concurrency**.
-
----
-
-## Requirements
-
-- Python 3.12+
-- Poetry (dependency management)
-
-### Install Poetry (recommended: pipx)
-
-```bash
-python -m pip install --user pipx
-python -m pipx ensurepath
-pipx install poetry
-```
-
-Alternative (official installer):
-
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
----
-
-## Setup
-
-```bash
-git clone <REPO_URL>
-cd zkybank
-cp .env.example .env
-poetry install
-```
-
----
-
-## Quick commands (Makefile)
-
-Run `make help` to see available targets.
-
-Common commands:
-
-```bash
-make help
-make clean-db
-make smoke
-make concurrency
-make lint
-make typecheck
-```
-
-> Note: If your Makefile has a literal `...` line inside it, remove that line (it will break `make` parsing).
-
----
-
-## Running the API
-
-Start the FastAPI server (adjust host/port as needed):
-
-```bash
-poetry run uvicorn zkybank.infrastructure.main:app --reload
-```
-
-Then open Swagger UI:
-
-- `http://127.0.0.1:8000/docs`
-
-### Database
-
-Default local SQLite database file is:
-
-- `data/zkybank.db`
-
-If you remove the DB file and then start the server, ensure tables exist (run one of the scripts below):
-
-```bash
-make smoke
-# or
-make concurrency
-```
-
----
-
-## API Endpoints
-
-### Create account
-
-`POST /accounts`
-
-Request:
-
-```json
-{
-  "account_number": "000001",
-  "initial_balance_cents": 10000,
-  "currency": "BRL"
-}
-```
-
-Response (201):
-
-```json
-{
-  "account_id": "…",
-  "account_number": "000001",
-  "balance_cents": 10000,
-  "currency": "BRL"
-}
-```
-
-### Deposit
-
-`POST /accounts/{account_number}/deposit`
-
-Request:
-
-```json
-{ "amount_cents": 1000, "currency": "BRL" }
-```
-
-### Withdraw
-
-`POST /accounts/{account_number}/withdraw`
-
-Request:
-
-```json
-{ "amount_cents": 500, "currency": "BRL" }
-```
-
-### Balance
-
-`GET /accounts/{account_number}/balance`
-
-Response:
-
-```json
-{ "account_number": "000001", "balance_cents": 9500, "currency": "BRL" }
-```
-
-### Transfer
-
-`POST /transfers`
-
-Request:
-
-```json
-{
-  "from_account_number": "000001",
-  "to_account_number": "000002",
-  "amount_cents": 500,
-  "currency": "BRL"
-}
-```
-
-Response:
-
-```json
-{
-  "correlation_id": "…",
-  "from_account_number": "000001",
-  "to_account_number": "000002",
-  "from_balance_cents": 9500,
-  "to_balance_cents": 500,
-  "currency": "BRL"
-}
-```
-
-### Transactions (ledger)
-
-`GET /accounts/{account_number}/transactions`
-
-Response (most recent first):
-
-```json
-[
-  {
-    "entry_id": "…",
-    "entry_type": "TRANSFER_OUT",
-    "amount_cents": 500,
-    "currency": "BRL",
-    "correlation_id": "…",
-    "occurred_at": "2026-01-12T21:13:49.684949Z",
-    "counterparty_account_number": "000002"
-  }
-]
-```
-
----
-
-## Concurrency strategy
-
-This project uses **optimistic locking** at the persistence layer:
-
-- Each account row has a `version` column.
-- Updates include the expected version.
-- If another transaction updated the same row first, the update fails and the use case retries.
-- Transfers lock accounts in a **stable order** (sorted by account_number) to reduce deadlock risk on databases that support row locks.
-
-The application layer exposes a `get_by_number_for_update(...)` port to allow implementations to apply locking where available.
-
----
-
-## Concurrency validation scripts
-
-### Smoke test (SQLAlchemy + SQLite)
-
-Creates tables and runs a basic workflow (create accounts, deposit, withdraw, transfer):
-
-```bash
-make smoke
-```
-
-### Concurrency truth table (SQLite)
-
-Runs the challenge truth-table scenarios (including parallel operations) and asserts final balances:
-
-```bash
-make concurrency
-```
-
----
-
-## Tests
-
-Run unit tests:
-
-```bash
-poetry run pytest -v
-```
-
-If your Makefile includes a test target:
-
-```bash
-make test
-```
-
----
+Basic banking API (accounts + transactions) built with **Hexagonal Architecture (Ports & Adapters)** and **Domain-Driven Design (DDD)** in
 
 ## Architecture
 
@@ -262,6 +23,273 @@ Use cases + ports (no infrastructure details).
 
 ---
 
-## Logging
+**Python**.
 
-Use cases emit structured logs (event name + `extra` fields) to help trace transactions and concurrency retries.
+It supports:
+- Account creation with initial balance
+- Deposits and withdrawals
+- Transfers between accounts
+- Transaction history (ledger)
+- Concurrency safety (optimistic locking + retries)
+
+---
+
+## Repository
+
+Clone:
+
+```bash
+git clone git@github.com:elitonzky/zkybank.git
+cd zkybank
+```
+
+---
+
+## Requirements
+
+- Python 3.12+
+- Poetry
+
+Install Poetry (choose one):
+
+```bash
+# Option A (recommended): pipx
+python -m pip install --user pipx
+python -m pipx ensurepath
+pipx install poetry
+```
+
+```bash
+# Option B: official installer
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+---
+
+## Setup
+
+```bash
+poetry install
+cp .env.example .env
+```
+
+By default, the project uses SQLite at `./data/zkybank.db`.
+
+---
+
+## Quick commands (Makefile)
+
+Run `make help` to see all targets.
+
+Common commands:
+
+```bash
+make dev
+make test
+make lint
+make typecheck
+make clean-db
+make smoke
+make concurrency
+```
+
+---
+
+## Running the API
+
+Fastest (recommended):
+
+```bash
+make dev
+```
+
+Manual:
+
+```bash
+poetry run uvicorn zkybank.infrastructure.main:app --reload
+```
+
+Open:
+- Swagger UI: http://127.0.0.1:8000/docs
+- OpenAPI JSON: http://127.0.0.1:8000/openapi.json
+
+---
+
+## API routes (examples)
+
+### Create account
+
+```bash
+curl -X POST http://127.0.0.1:8000/accounts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_number": "000001",
+    "initial_balance_cents": 10000,
+    "currency": "BRL"
+  }'
+```
+
+Response example:
+
+```json
+{
+  "account_id": "f6b3b5e6-1f22-4b65-9b4a-0c5c2c9e3d34",
+  "account_number": "000001",
+  "balance_cents": 10000,
+  "currency": "BRL"
+}
+```
+
+### Deposit
+
+```bash
+curl -X POST http://127.0.0.1:8000/accounts/000001/deposit \
+  -H "Content-Type: application/json" \
+  -d '{ "amount_cents": 500, "currency": "BRL" }'
+```
+
+### Withdraw
+
+```bash
+curl -X POST http://127.0.0.1:8000/accounts/000001/withdraw \
+  -H "Content-Type: application/json" \
+  -d '{ "amount_cents": 200, "currency": "BRL" }'
+```
+
+### Transfer
+
+```bash
+curl -X POST http://127.0.0.1:8000/transfers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from_account_number": "000001",
+    "to_account_number": "000002",
+    "amount_cents": 500,
+    "currency": "BRL"
+  }'
+```
+
+Response example:
+
+```json
+{
+  "correlation_id": "bb7f7eb8-956a-4c84-a44d-ea4df70a0fd4",
+  "from_account_number": "000001",
+  "to_account_number": "000002",
+  "from_balance_cents": 9500,
+  "to_balance_cents": 500,
+  "currency": "BRL"
+}
+```
+
+### Get balance
+
+```bash
+curl http://127.0.0.1:8000/accounts/000001/balance
+```
+
+Response:
+
+```json
+{
+  "account_number": "000001",
+  "balance_cents": 9500,
+  "currency": "BRL"
+}
+```
+
+### List transactions (ledger)
+
+```bash
+curl http://127.0.0.1:8000/accounts/000001/transactions
+```
+
+Response example:
+
+```json
+[
+  {
+    "entry_id": "776d86af-3cfb-4bdd-b455-9a2dc52732a8",
+    "entry_type": "TRANSFER_OUT",
+    "amount_cents": 500,
+    "currency": "BRL",
+    "correlation_id": "bb7f7eb8-956a-4c84-a44d-ea4df70a0fd4",
+    "occurred_at": "2026-01-12T21:13:49.684949Z",
+    "counterparty_account_number": "000002"
+  },
+  {
+    "entry_id": "23ecd42c-93aa-42e3-a4d4-8ffea62e69e2",
+    "entry_type": "DEPOSIT",
+    "amount_cents": 10000,
+    "currency": "BRL",
+    "correlation_id": null,
+    "occurred_at": "2026-01-12T21:13:43.253546Z",
+    "counterparty_account_number": null
+  }
+]
+```
+
+`counterparty_account_number` is populated for transfer entries (`TRANSFER_IN` / `TRANSFER_OUT`) so you can see who sent/received.
+
+---
+
+## Concurrency approach
+
+This project uses **optimistic locking** on accounts:
+
+- `accounts.version` is incremented on every update.
+- SQLAlchemy is configured with `version_id_col`, so updates include the expected version.
+- If another transaction already updated the row, SQLAlchemy raises a concurrency error.
+- Use cases (`deposit`, `withdraw`, `transfer`) retry a few times and log conflicts.
+
+Notes about SQLite:
+- SQLite uses coarse-grained locking for writes, so heavy stress tests may hit `database is locked`.
+
+---
+
+## Concurrency truth table script
+
+Runs the required concurrency scenarios (in parallel) and asserts final balances:
+
+```bash
+make concurrency
+```
+
+---
+
+## Smoke test (SQLite)
+
+Creates tables, runs a few operations, and prints the results:
+
+```bash
+make smoke
+```
+
+---
+
+## Testing
+
+```bash
+make test
+# or
+poetry run pytest -q
+```
+
+---
+
+## Pre-commit
+
+Enable git hooks locally:
+
+```bash
+poetry run pre-commit install
+poetry run pre-commit run --all-files
+```
+
+---
+
+## Author
+
+Eliton Jorge
+Email: eliton-jorge@hotmail.com
+LinkedIn: https://www.linkedin.com/in/eliton-jorge-zky/
