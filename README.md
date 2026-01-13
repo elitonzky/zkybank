@@ -2,213 +2,266 @@
 
 Example project implementing a basic banking system using **Hexagonal Architecture (Ports & Adapters)** and **Domain-Driven Design (DDD)** in Python.
 
-The repository is built incrementally and keeps the core domain framework-agnostic. The current stage includes:
-
-- Domain layer (value objects, entities, domain errors)
-- Application layer (DTOs, ports, UnitOfWork, use cases)
-- Outbound persistence adapter (SQLAlchemy) using SQLite by default (Postgres-ready via `DATABASE_URL`)
-- Inbound HTTP adapter (FastAPI)
-- Unit tests for domain and application use cases
-- Developer tooling (pre-commit + Makefile) and a SQLite smoke script
+The project supports account creation, deposits, withdrawals, transfers, and balance/transaction queries, with an explicit focus on **transaction integrity under concurrency**.
 
 ---
 
-## Architecture
+## Requirements
 
-### Domain Layer (`src/zkybank/domain`)
-Framework-agnostic core business rules.
+- Python 3.12+
+- Poetry (dependency management)
 
-#### Domain Errors
-Domain errors represent expected business-rule violations and are raised by domain objects:
-
-- `DomainError` (base)
-- `InvalidMoneyError`
-- `InvalidAccountNumberError`
-- `InsufficientFundsError`
-- `SameAccountTransferError`
-- `InvalidTransactionAmountError`
-
-#### Value Objects
-Immutable and validated at instantiation:
-
-- **Money**: monetary amount in cents with currency validation and arithmetic/comparison operations.
-- **AccountNumber**: digit-only account number with length constraints.
-- **AccountId**: internal UUID identifier.
-
-#### Entities
-Domain entities encapsulating business behavior:
-
-- **Account**: open/deposit/withdraw operations with balance invariants.
-- **LedgerEntry**: append-only transaction log (`DEPOSIT`, `WITHDRAWAL`, `TRANSFER_IN`, `TRANSFER_OUT`).
-
----
-
-### Application Layer (`src/zkybank/application`)
-Orchestrates domain behavior via ports (no infrastructure details).
-
-#### DTOs
-- `dto/commands.py`: inputs for use cases.
-- `dto/results.py`: outputs for use cases.
-
-#### Ports
-- `AccountRepository`
-- `LedgerRepository`
-- `UnitOfWork` (transaction boundary and repository access; includes a concurrency hook via `get_by_number_for_update`)
-
-#### Use Cases
-- `CreateAccountUseCase`
-- `DepositUseCase`
-- `WithdrawUseCase`
-- `TransferUseCase` (uses stable lock ordering to reduce deadlock risk once DB locks are applied)
-- `GetBalanceUseCase`
-
----
-
-### Adapters
-
-#### Outbound Adapter: Persistence (SQLAlchemy)
-Implements the application ports using SQLAlchemy repositories and a SQLAlchemy-backed `UnitOfWork`.
-
-- SQLite is the default local database.
-- Switching to Postgres should be possible by changing only `DATABASE_URL`.
-
-#### Inbound Adapter: HTTP (FastAPI)
-Exposes the application use cases via HTTP routes and maps domain/application errors to HTTP responses.
-
----
-
-## Configuration
-
-### Environment variables
-Copy the example file and adjust as needed:
+### Install Poetry (recommended: pipx)
 
 ```bash
-cp .env.example .env
+python -m pip install --user pipx
+python -m pipx ensurepath
+pipx install poetry
 ```
 
-Example variables:
+Alternative (official installer):
 
-- `DATABASE_URL` (default: SQLite)
-- `LOG_LEVEL`
-
-> `.env` is local-only and should **not** be committed. `.env.example` is safe to commit and acts as documentation.
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
 
 ---
 
-## Development
+## Setup
 
-### Install dependencies
 ```bash
+git clone <REPO_URL>
+cd zkybank
+cp .env.example .env
 poetry install
 ```
 
-### Pre-commit
-Enable git hooks locally:
+---
 
-```bash
-poetry run pre-commit install
-poetry run pre-commit run --all-files
-```
+## Quick commands (Makefile)
 
-### Makefile
+Run `make help` to see available targets.
+
 Common commands:
 
 ```bash
-make dev
-make test
-make precommit
-make smoke
+make help
 make clean-db
+make smoke
+make concurrency
+make lint
+make typecheck
 ```
+
+> Note: If your Makefile has a literal `...` line inside it, remove that line (it will break `make` parsing).
 
 ---
 
 ## Running the API
 
-Run the FastAPI server with environment loading from `.env`:
+Start the FastAPI server (adjust host/port as needed):
 
 ```bash
-make dev
+poetry run uvicorn zkybank.infrastructure.main:app --reload
 ```
 
-Or manually:
+Then open Swagger UI:
+
+- `http://127.0.0.1:8000/docs`
+
+### Database
+
+Default local SQLite database file is:
+
+- `data/zkybank.db`
+
+If you remove the DB file and then start the server, ensure tables exist (run one of the scripts below):
 
 ```bash
-poetry run uvicorn zkybank.infrastructure.main:app --reload --env-file .env
+make smoke
+# or
+make concurrency
 ```
-
-Once running, open:
-
-- Swagger UI: `http://localhost:8000/docs`
-- OpenAPI JSON: `http://localhost:8000/openapi.json`
 
 ---
 
-## API routes
+## API Endpoints
 
-The FastAPI adapter groups routes into **accounts** and **transfers**.
+### Create account
 
-Typical operations exposed:
-- Create account
-- Deposit
-- Withdraw
-- Transfer between accounts
-- Get balance
+`POST /accounts`
 
-> Route paths may vary depending on your `routes/accounts.py` and `routes/transfers.py`. If you rename paths, update this section accordingly.
+Request:
+
+```json
+{
+  "account_number": "000001",
+  "initial_balance_cents": 10000,
+  "currency": "BRL"
+}
+```
+
+Response (201):
+
+```json
+{
+  "account_id": "…",
+  "account_number": "000001",
+  "balance_cents": 10000,
+  "currency": "BRL"
+}
+```
+
+### Deposit
+
+`POST /accounts/{account_number}/deposit`
+
+Request:
+
+```json
+{ "amount_cents": 1000, "currency": "BRL" }
+```
+
+### Withdraw
+
+`POST /accounts/{account_number}/withdraw`
+
+Request:
+
+```json
+{ "amount_cents": 500, "currency": "BRL" }
+```
+
+### Balance
+
+`GET /accounts/{account_number}/balance`
+
+Response:
+
+```json
+{ "account_number": "000001", "balance_cents": 9500, "currency": "BRL" }
+```
+
+### Transfer
+
+`POST /transfers`
+
+Request:
+
+```json
+{
+  "from_account_number": "000001",
+  "to_account_number": "000002",
+  "amount_cents": 500,
+  "currency": "BRL"
+}
+```
+
+Response:
+
+```json
+{
+  "correlation_id": "…",
+  "from_account_number": "000001",
+  "to_account_number": "000002",
+  "from_balance_cents": 9500,
+  "to_balance_cents": 500,
+  "currency": "BRL"
+}
+```
+
+### Transactions (ledger)
+
+`GET /accounts/{account_number}/transactions`
+
+Response (most recent first):
+
+```json
+[
+  {
+    "entry_id": "…",
+    "entry_type": "TRANSFER_OUT",
+    "amount_cents": 500,
+    "currency": "BRL",
+    "correlation_id": "…",
+    "occurred_at": "2026-01-12T21:13:49.684949Z",
+    "counterparty_account_number": "000002"
+  }
+]
+```
 
 ---
 
-## Smoke test (SQLite)
+## Concurrency strategy
 
-A smoke script is available to run an end-to-end flow (create → deposit → withdraw → transfer) using SQLite + SQLAlchemy adapters.
+This project uses **optimistic locking** at the persistence layer:
 
-Run:
+- Each account row has a `version` column.
+- Updates include the expected version.
+- If another transaction updated the same row first, the update fails and the use case retries.
+- Transfers lock accounts in a **stable order** (sorted by account_number) to reduce deadlock risk on databases that support row locks.
+
+The application layer exposes a `get_by_number_for_update(...)` port to allow implementations to apply locking where available.
+
+---
+
+## Concurrency validation scripts
+
+### Smoke test (SQLAlchemy + SQLite)
+
+Creates tables and runs a basic workflow (create accounts, deposit, withdraw, transfer):
 
 ```bash
 make smoke
 ```
 
-This will:
-- create/reset `data/zkybank.db`
-- create tables
-- execute a small set of transactions
-- print step-by-step results
+### Concurrency truth table (SQLite)
+
+Runs the challenge truth-table scenarios (including parallel operations) and asserts final balances:
+
+```bash
+make concurrency
+```
 
 ---
 
-## Testing
+## Tests
 
-Tests cover:
-
-- **Domain**: value objects and entity invariants.
-- **Application**: use cases using fakes (in-memory repositories + fake UnitOfWork).
-
-Run all tests:
-
-```bash
-make test
-```
-
-Or:
+Run unit tests:
 
 ```bash
 poetry run pytest -v
 ```
 
+If your Makefile includes a test target:
+
+```bash
+make test
+```
+
 ---
 
-## Project Status
+## Architecture
 
-- ✅ Domain layer: value objects, entities, domain errors
-- ✅ Application layer: DTOs, ports, UnitOfWork, use cases
-- ✅ Unit tests: domain (entities + value objects) and application use cases (with fakes)
-- ✅ Outbound adapter: SQLAlchemy persistence (SQLite default; Postgres-ready via `DATABASE_URL`)
-- ✅ Inbound adapter: FastAPI HTTP layer (routes + error handling)
-- ✅ Dev tooling: pre-commit + Makefile
-- ✅ Smoke script: SQLite end-to-end demo
+### Domain (`src/zkybank/domain`)
+Framework-agnostic business rules.
 
-### Next
-- 🔄 Integration tests for HTTP layer (FastAPI + SQLite)
-- 🔄 Concurrency-focused tests (simulated concurrent requests / transactional locking validation)
-- 🔄 CI workflow (GitHub Actions) to run unit tests + linters on PRs
+- Value Objects: `Money`, `AccountNumber`, `AccountId`
+- Entities: `Account`, `LedgerEntry`
+- Domain Errors: `InvalidMoneyError`, `InvalidAccountNumberError`, `InsufficientFundsError`, etc.
+
+### Application (`src/zkybank/application`)
+Use cases + ports (no infrastructure details).
+
+- Use cases: `CreateAccountUseCase`, `DepositUseCase`, `WithdrawUseCase`, `TransferUseCase`, `GetBalanceUseCase`, `GetTransactionsUseCase`
+- Ports: repositories + UnitOfWork
+
+### Adapters (`src/zkybank/adapters`)
+- Inbound: FastAPI HTTP routes/schemas
+- Outbound: SQLAlchemy repositories + UnitOfWork (SQLite/Postgres-ready)
+
+---
+
+## Logging
+
+Use cases emit structured logs (event name + `extra` fields) to help trace transactions and concurrency retries.
